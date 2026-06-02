@@ -46,28 +46,31 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/** @type {Record<string, { add: [number, number]; mult: [number, number]; div: [number, number]; maxProduct: number; maxDividend: number }>} */
+/** @type {Record<string, { add: [number, number]; mult: [number, number]; div: [number, number]; quotient: [number, number]; maxProduct: number; maxDividend: number }>} */
 const LIMITS = {
   easy: {
     add: [1, 99],
     mult: [2, 12],
     div: [2, 12],
+    quotient: [2, 12],
     maxProduct: 144,
     maxDividend: 144,
   },
   medium: {
     add: [10, 99],
-    mult: [10, 31],
-    div: [11, 99],
-    maxProduct: 2500,
-    maxDividend: 2500,
+    mult: [10, 25],
+    div: [11, 50],
+    quotient: [2, 15],
+    maxProduct: 999,
+    maxDividend: 999,
   },
   hard: {
     add: [10, 999],
     mult: [10, 99],
-    div: [11, 999],
+    div: [11, 99],
+    quotient: [10, 99],
     maxProduct: 50_000,
-    maxDividend: 50_000,
+    maxDividend: 10_000,
   },
 };
 
@@ -119,7 +122,7 @@ function buildProblem(difficulty, op) {
     }
     case '÷': {
       const [divMin, divMax] = limits.div;
-      const [quotMin, quotMax] = limits.mult;
+      const [quotMin, quotMax] = limits.quotient;
       b = randInt(divMin, divMax);
       answer = randInt(quotMin, quotMax);
       a = b * answer;
