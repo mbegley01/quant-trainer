@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quant Trainer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="panel header">
+        <h1 class="title">Quant Trainer</h1>
+        <button type="button" id="theme-toggle" class="btn-icon" aria-label="Toggle theme">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M7 0h2v2H7zM12.88 1.637l1.414 1.415-1.415 1.413-1.413-1.414zM14 7h2v2h-2zM12.95 14.433l-1.414-1.413 1.413-1.415 1.415 1.414zM7 14h2v2H7zM2.98 14.364l-1.413-1.415 1.414-1.414 1.414 1.415zM0 7h2v2H0zM3.05 1.706 4.463 3.12 3.05 4.535 1.636 3.12z"
+            />
+            <path d="M8 4C5.8 4 4 5.8 4 8s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4Z" />
+          </svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M6.2 1C3.2 1.8 1 4.6 1 7.9 1 11.8 4.2 15 8.1 15c3.3 0 6-2.2 6.9-5.2C9.7 11.2 4.8 6.3 6.2 1Z"
+            />
+          </svg>
+        </button>
+      </header>
+
+      <main>
+        <!-- Setup -->
+        <section id="screen-setup" class="panel">
+          <p class="lede">Solve as many problems as you can before time runs out.</p>
+
+          <fieldset class="field-group">
+            <legend class="label">Difficulty</legend>
+            <div class="radio-row" role="radiogroup" aria-label="Difficulty">
+              <label class="chip">
+                <input type="radio" name="difficulty" value="easy" checked />
+                <span>Easy</span>
+                <span class="chip-hint">1–2 digits</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="difficulty" value="medium" />
+                <span>Medium</span>
+                <span class="chip-hint">2 digits</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="difficulty" value="hard" />
+                <span>Hard</span>
+                <span class="chip-hint">2–3 digits</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="field-group">
+            <label class="label" for="time-slider">
+              Time: <span id="time-label">2</span> min
+            </label>
+            <input
+              type="range"
+              id="time-slider"
+              class="slider"
+              min="1"
+              max="10"
+              value="2"
+              step="1"
+            />
+            <div class="slider-ticks" aria-hidden="true">
+              <span>1</span><span>5</span><span>10</span>
+            </div>
+          </div>
+
+          <p class="high-score-line">
+            High score: <strong id="high-score-display">0</strong>
+          </p>
+
+          <button type="button" id="start-btn" class="btn btn-primary">Start</button>
+        </section>
+
+        <!-- Playing -->
+        <section id="screen-play" class="panel hidden" aria-live="polite">
+          <div class="stats-row">
+            <div class="stat">
+              <span class="stat-label">Time</span>
+              <span id="timer" class="stat-value">2:00</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Score</span>
+              <span id="score" class="stat-value">0</span>
+            </div>
+          </div>
+
+          <p id="problem" class="problem">12 × 7 = ?</p>
+
+          <form id="answer-form" class="answer-form">
+            <input
+              type="number"
+              id="answer-input"
+              class="input"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="Your answer"
+              required
+            />
+            <button type="submit" class="btn">Submit</button>
+          </form>
+
+          <p id="feedback" class="feedback" aria-live="assertive"></p>
+
+          <button type="button" id="quit-btn" class="btn btn-quit">Quit</button>
+        </section>
+
+        <!-- Results -->
+        <section id="screen-results" class="panel hidden">
+          <h2 class="results-title">Time's up</h2>
+          <p class="results-score">
+            You solved <strong id="final-score">0</strong> problems.
+          </p>
+          <p id="new-record" class="new-record hidden">New high score!</p>
+          <p class="high-score-line">
+            High score: <strong id="results-high-score">0</strong>
+          </p>
+          <button type="button" id="again-btn" class="btn btn-primary">Play again</button>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
