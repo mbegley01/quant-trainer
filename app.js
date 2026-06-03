@@ -1,10 +1,5 @@
 const OPS = ['+', '-', '×', '÷'];
 const FRAC_DENOMS = [2, 3, 4, 5, 6, 8, 10, 12];
-const WILDCARD_WEIGHTS = [
-  { kind: 'frac', weight: 2 },
-  { kind: 'pow', weight: 2 },
-  { kind: 'arith', weight: 1 },
-];
 const STORAGE_PREFIX = 'quant-trainer-highscore';
 
 const $ = (id) => document.getElementById(id);
@@ -75,16 +70,16 @@ const LIMITS = {
     mult: [10, 99],
     div: [11, 99],
     quotient: [10, 99],
-    maxProduct: 50_000,
-    maxDividend: 10_000,
+    maxProduct: 50000,
+    maxDividend: 10000,
   },
   wildcard: {
     add: [10, 99],
     mult: [10, 99],
     div: [11, 99],
     quotient: [10, 99],
-    maxProduct: 50_000,
-    maxDividend: 10_000,
+    maxProduct: 50000,
+    maxDividend: 10000,
   },
 };
 
@@ -134,105 +129,65 @@ function answersMatch(given, expected) {
   return Math.abs(given - expected) < 0.01;
 }
 
-function randomFraction() {
-  const d = pick(FRAC_DENOMS);
-  const n = randInt(1, d * 2);
-  return simplifyFrac(n, d);
-}
-
-function pickWeighted(items) {
-  const total = items.reduce((sum, item) => sum + item.weight, 0);
-  let roll = Math.random() * total;
-  for (const item of items) {
-    roll -= item.weight;
-    if (roll <= 0) return item.kind;
+function focusAnswerInput() {
+  if (!els.answerInput) return;
+  try {
+    els.answerInput.focus({ preventScroll: true });
+  } catch {
+    els.answerInput.focus();
   }
-  return items[items.length - 1].kind;
 }
 
-/** Build fractions with a guaranteed whole-number answer (no random rejection). */
-function buildFractionProblem() {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const style = pick(['same-denom', 'mul-int', 'div-frac', 'sub-same']);
+function generateWildcardProblem() {
+  const roll = Math.random();
 
-    if (style === 'same-denom') {
-      const d = pick(FRAC_DENOMS);
-      const answer = randInt(2, 20);
-      const maxN1 = answer * d - 1;
-      if (maxN1 < 1) continue;
-      const n1 = randInt(1, Math.min(d * 2, maxN1));
+  if (roll < 0.34) {
+    const d = pick(FRAC_DENOMS);
+    const answer = randInt(1, 15);
+    const maxN1 = answer * d - 1;
+    if (maxN1 >= 1) {
+      const n1 = randInt(1, maxN1);
       const n2 = answer * d - n1;
-      if (n2 < 1) continue;
-      const text = `${formatFrac(n1, d)} + ${formatFrac(n2, d)} = ?`;
-      return { text, answer, op: 'frac' };
+      if (n2 >= 1) {
+        return {
+          text: `${formatFrac(n1, d)} + ${formatFrac(n2, d)} = ?`,
+          answer,
+        };
+      }
     }
-
-    if (style === 'sub-same') {
-      const d = pick(FRAC_DENOMS);
-      const n1 = randInt(2, d * 2);
-      if (n1 < 2) continue;
-      const n2 = randInt(1, n1 - 1);
-      const answer = (n1 - n2) / d;
-      if (!isIntegerValue(answer) || answer < 1) continue;
-      const text = `${formatFrac(n1, d)} - ${formatFrac(n2, d)} = ?`;
-      return { text, answer: Math.round(answer), op: 'frac' };
-    }
-
-    if (style === 'mul-int') {
-      const d = pick(FRAC_DENOMS);
-      const n = randInt(1, d * 2);
-      const [sn, sd] = simplifyFrac(n, d);
-      const answer = randInt(2, 40);
-      if ((answer * sd) % sn !== 0) continue;
-      const mult = (answer * sd) / sn;
-      if (mult < 2 || mult > 24) continue;
-      const text = `${formatFrac(sn, sd)} × ${mult} = ?`;
-      return { text, answer, op: 'frac' };
-    }
-
-    const answer = randInt(2, 24);
-    const [n2, d2] = randomFraction();
-    const [sn2, sd2] = simplifyFrac(n2, d2);
-    const [n1, d1] = simplifyFrac(answer * sn2, sd2);
-    if (d1 > 99 || n1 > 99) continue;
-    const text = `${formatFrac(n1, d1)} ÷ ${formatFrac(sn2, sd2)} = ?`;
-    return { text, answer, op: 'frac' };
   }
 
-  const d = 4;
-  return { text: `1/2 + 1/2 = ?`, answer: 1, op: 'frac' };
-}
-
-function buildExponentProblem() {
-  const base = randInt(2, 12);
-  const exp = randInt(2, 4);
-  const answer = base ** exp;
-  return { text: `${base}^${exp} = ?`, answer, op: 'pow' };
-}
-
-function buildWildcardProblem() {
-  const limits = LIMITS.wildcard;
-  const kind = pickWeighted(WILDCARD_WEIGHTS);
-
-  if (kind === 'frac') {
-    const problem = buildFractionProblem();
-    return { text: problem.text, answer: problem.answer };
+  if (roll < 0.67) {
+    const base = randInt(2, 12);
+    const exp = randInt(2, 4);
+    return {
+      text: `${base}^${exp} = ?`,
+      answer: Math.pow(base, exp),
+    };
   }
 
-  if (kind === 'pow') {
-    const problem = buildExponentProblem();
-    return { text: problem.text, answer: problem.answer };
+  const mult = randInt(2, 12);
+  const d = pick(FRAC_DENOMS);
+  const n = randInt(1, d - 1);
+  const answer = randInt(2, 30);
+  if ((answer * d) % n === 0) {
+    const m = (answer * d) / n;
+    if (m >= 2 && m <= 20) {
+      return {
+        text: `${formatFrac(n, d)} × ${m} = ?`,
+        answer,
+      };
+    }
   }
 
   for (let i = 0; i < 20; i++) {
-    const problem = buildProblem('wildcard', pick(OPS));
-    if (withinLimits(problem, limits)) {
+    const problem = buildProblem('hard', pick(OPS));
+    if (withinLimits(problem, LIMITS.hard)) {
       return { text: problem.text, answer: problem.answer };
     }
   }
 
-  const problem = buildFractionProblem();
-  return { text: problem.text, answer: problem.answer };
+  return { text: '3^2 = ?', answer: 9 };
 }
 
 function easyAddSubOperand() {
@@ -304,34 +259,22 @@ function withinLimits({ a, b, op, answer }, limits) {
   return true;
 }
 
-function normalizeProblem(problem) {
-  const answer = Number(problem?.answer);
-  const text = typeof problem?.text === 'string' ? problem.text : '2 + 2 = ?';
-  if (!Number.isFinite(answer)) {
-    return { text: '2 + 2 = ?', answer: 4 };
-  }
-  return { text, answer };
-}
-
 function generateProblem(difficulty) {
-  try {
-    if (difficulty === 'wildcard') {
-      return normalizeProblem(generateWildcardProblem());
-    }
-
-    const limits = LIMITS[difficulty] ?? LIMITS.easy;
-
-    for (let i = 0; i < 40; i++) {
-      const problem = buildProblem(difficulty, pick(OPS));
-      if (withinLimits(problem, limits)) {
-        return normalizeProblem(problem);
-      }
-    }
-
-    return normalizeProblem(buildProblem(difficulty, '+'));
-  } catch {
-    return { text: '2 + 2 = ?', answer: 4 };
+  if (difficulty === 'wildcard') {
+    return generateWildcardProblem();
   }
+
+  const limits = LIMITS[difficulty] ?? LIMITS.easy;
+
+  for (let i = 0; i < 40; i++) {
+    const problem = buildProblem(difficulty, pick(OPS));
+    if (withinLimits(problem, limits)) {
+      return { text: problem.text, answer: problem.answer };
+    }
+  }
+
+  const fallback = buildProblem(difficulty, '+');
+  return { text: fallback.text, answer: fallback.answer };
 }
 
 function scoreKey(difficulty, minutes) {
@@ -368,7 +311,12 @@ function formatTime(ms) {
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
-    el.classList.toggle('hidden', key !== name);
+    if (!el) return;
+    const active = key === name;
+    el.classList.toggle('hidden', !active);
+    if ('inert' in el) {
+      el.inert = !active;
+    }
   });
 }
 
@@ -378,8 +326,10 @@ function clearFeedback() {
 }
 
 function enableAnswerInput() {
+  if (!els.answerInput) return;
   els.answerInput.disabled = false;
   els.answerInput.readOnly = false;
+  els.answerInput.removeAttribute('aria-disabled');
 }
 
 function stopTimers() {
@@ -414,7 +364,8 @@ function tickTimer() {
 function startGame() {
   stopTimers();
   state.difficulty = selectedDifficulty();
-  state.minutes = Number(els.timeSlider.value);
+  const mins = Number(els.timeSlider?.value);
+  state.minutes = Number.isFinite(mins) && mins >= 1 ? mins : 2;
   state.score = 0;
   state.endsAt = Date.now() + state.minutes * 60 * 1000;
 
@@ -425,7 +376,7 @@ function startGame() {
 
   showScreen('play');
   nextProblem();
-  els.answerInput.focus({ preventScroll: true });
+  focusAnswerInput();
 
   state.timerId = requestAnimationFrame(tickTimer);
 }
@@ -472,10 +423,14 @@ function checkAnswer(raw) {
   }
 
   if (answersMatch(given, state.current.answer)) {
+    if (state.wrongTimeoutId !== null) {
+      clearTimeout(state.wrongTimeoutId);
+      state.wrongTimeoutId = null;
+    }
     state.score += 1;
     els.score.textContent = String(state.score);
     nextProblem();
-    els.answerInput.focus();
+    focusAnswerInput();
   } else {
     const correct = state.current.answer;
     els.feedback.textContent = `Wrong — answer was ${formatAnswer(correct)}`;
@@ -486,7 +441,7 @@ function checkAnswer(raw) {
       state.wrongTimeoutId = null;
       if (Date.now() < state.endsAt) {
         nextProblem();
-        els.answerInput.focus({ preventScroll: true });
+        focusAnswerInput();
       }
     }, 800);
   }
@@ -522,6 +477,10 @@ els.answerForm.addEventListener('submit', (e) => {
 });
 
 els.againBtn.addEventListener('click', () => {
+  stopTimers();
+  state.current = null;
+  state.endsAt = 0;
+  enableAnswerInput();
   updateHighScoreDisplay();
   showScreen('setup');
 });

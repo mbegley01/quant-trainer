@@ -369,9 +369,15 @@ body {
 }
 
 .answer-form {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+#screen-play:not(.hidden) .input {
+  pointer-events: auto;
 }
 
 .input {
