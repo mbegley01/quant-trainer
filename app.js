@@ -1,4 +1,7 @@
 const OPS = ['+', '-', '×', '÷'];
+const FRAC_OPS = ['+', '-', '×', '÷'];
+const FRAC_DENOMS = [2, 3, 4, 5, 6, 8, 10, 12];
+const WILDCARD_KINDS = ['arith', 'arith', 'frac', 'frac', 'pow', 'pow'];
 const STORAGE_PREFIX = 'quant-trainer-highscore';
 
 const $ = (id) => document.getElementById(id);
@@ -72,7 +75,141 @@ const LIMITS = {
     maxProduct: 50_000,
     maxDividend: 10_000,
   },
+  wildcard: {
+    add: [10, 99],
+    mult: [10, 99],
+    div: [11, 99],
+    quotient: [10, 99],
+    maxProduct: 50_000,
+    maxDividend: 10_000,
+  },
 };
+
+function gcd(a, b) {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b) {
+    const t = b;
+    b = a % b;
+    a = t;
+  }
+  return a || 1;
+}
+
+function simplifyFrac(n, d) {
+  if (d === 0) return [n, 1];
+  const g = gcd(n, d);
+  let sn = n / g;
+  let sd = d / g;
+  if (sd < 0) {
+    sn = -sn;
+    sd = -sd;
+  }
+  return [sn, sd];
+}
+
+function formatFrac(n, d) {
+  const [sn, sd] = simplifyFrac(n, d);
+  if (sd === 1) return String(sn);
+  return `${sn}/${sd}`;
+}
+
+function isIntegerValue(x) {
+  return Number.isFinite(x) && Math.abs(x - Math.round(x)) < 1e-9;
+}
+
+function formatAnswer(x) {
+  if (!Number.isFinite(x)) return String(x);
+  if (isIntegerValue(x)) return String(Math.round(x));
+  const rounded = Math.round(x * 100) / 100;
+  return String(rounded);
+}
+
+function answersMatch(given, expected) {
+  if (!Number.isFinite(given) || !Number.isFinite(expected)) return false;
+  if (isIntegerValue(expected)) return given === Math.round(expected);
+  return Math.abs(given - expected) < 0.01;
+}
+
+function randomFraction() {
+  const d = pick(FRAC_DENOMS);
+  const n = randInt(1, d * 2);
+  return simplifyFrac(n, d);
+}
+
+function evalFractionOp(op, n1, d1, n2, d2) {
+  switch (op) {
+    case '+':
+      return (n1 * d2 + n2 * d1) / (d1 * d2);
+    case '-':
+      return (n1 * d2 - n2 * d1) / (d1 * d2);
+    case '×':
+      return (n1 * n2) / (d1 * d2);
+    case '÷':
+      return (n1 * d2) / (d1 * n2);
+    default:
+      return NaN;
+  }
+}
+
+function buildFractionProblem() {
+  for (let i = 0; i < 60; i++) {
+    const op = pick(FRAC_OPS);
+    let [n1, d1] = randomFraction();
+    let [n2, d2] = randomFraction();
+
+    if (op === '-' && n1 * d2 < n2 * d1) {
+      [n1, d1, n2, d2] = [n2, d2, n1, d1];
+    }
+
+    if (op === '÷' && n2 === 0) continue;
+
+    const answer = evalFractionOp(op, n1, d1, n2, d2);
+    if (!Number.isFinite(answer) || answer < 0) continue;
+    if (!isIntegerValue(answer)) continue;
+    if (answer > 500) continue;
+
+    const text = `${formatFrac(n1, d1)} ${op} ${formatFrac(n2, d2)} = ?`;
+    return { text, answer: Math.round(answer), op: 'frac' };
+  }
+  return null;
+}
+
+function buildExponentProblem() {
+  for (let i = 0; i < 40; i++) {
+    const base = randInt(2, 15);
+    const exp = randInt(2, 5);
+    const answer = base ** exp;
+    if (answer > 9999) continue;
+    return { text: `${base}^${exp} = ?`, answer, op: 'pow' };
+  }
+  return null;
+}
+
+function buildWildcardProblem() {
+  const limits = LIMITS.wildcard;
+
+  for (let i = 0; i < 50; i++) {
+    const kind = pick(WILDCARD_KINDS);
+    let problem = null;
+
+    if (kind === 'arith') {
+      problem = buildProblem('wildcard', pick(OPS));
+      if (!withinLimits(problem, limits)) problem = null;
+    } else if (kind === 'frac') {
+      problem = buildFractionProblem();
+    } else {
+      problem = buildExponentProblem();
+    }
+
+    if (problem) {
+      return { text: problem.text, answer: problem.answer };
+    }
+  }
+
+  const fallback = buildExponentProblem() ?? buildProblem('wildcard', '+');
+  return { text: fallback.text, answer: fallback.answer };
+}
 
 function easyAddSubOperand() {
   return Math.random() < 0.5 ? randInt(1, 9) : randInt(10, 99);
@@ -144,6 +281,10 @@ function withinLimits({ a, b, op, answer }, limits) {
 }
 
 function generateProblem(difficulty) {
+  if (difficulty === 'wildcard') {
+    return generateWildcardProblem();
+  }
+
   const limits = LIMITS[difficulty] ?? LIMITS.easy;
 
   for (let i = 0; i < 40; i++) {
@@ -288,14 +429,14 @@ function checkAnswer(raw) {
     return;
   }
 
-  if (given === state.current.answer) {
+  if (answersMatch(given, state.current.answer)) {
     state.score += 1;
     els.score.textContent = String(state.score);
     nextProblem();
     els.answerInput.focus();
   } else {
     const correct = state.current.answer;
-    els.feedback.textContent = `Wrong — answer was ${correct}`;
+    els.feedback.textContent = `Wrong — answer was ${formatAnswer(correct)}`;
     els.feedback.className = 'feedback bad';
     els.answerInput.disabled = true;
     state.wrongTimeoutId = setTimeout(() => {

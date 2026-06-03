@@ -54,6 +54,11 @@
                 <span>Hard</span>
                 <span class="chip-hint">2–3 digits</span>
               </label>
+              <label class="chip chip-wildcard">
+                <input type="radio" name="difficulty" value="wildcard" />
+                <span>Wildcard</span>
+                <span class="chip-hint">fractions & exponents</span>
+              </label>
             </div>
           </fieldset>
 
@@ -102,7 +107,8 @@
               type="number"
               id="answer-input"
               class="input"
-              inputmode="numeric"
+              inputmode="decimal"
+              step="any"
               autocomplete="off"
               placeholder="Your answer"
               required
