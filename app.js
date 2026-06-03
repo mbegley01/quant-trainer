@@ -1,7 +1,10 @@
 const OPS = ['+', '-', '×', '÷'];
-const FRAC_OPS = ['+', '-', '×', '÷'];
 const FRAC_DENOMS = [2, 3, 4, 5, 6, 8, 10, 12];
-const WILDCARD_KINDS = ['arith', 'arith', 'frac', 'frac', 'pow', 'pow'];
+const WILDCARD_WEIGHTS = [
+  { kind: 'frac', weight: 2 },
+  { kind: 'pow', weight: 2 },
+  { kind: 'arith', weight: 1 },
+];
 const STORAGE_PREFIX = 'quant-trainer-highscore';
 
 const $ = (id) => document.getElementById(id);
@@ -137,78 +140,99 @@ function randomFraction() {
   return simplifyFrac(n, d);
 }
 
-function evalFractionOp(op, n1, d1, n2, d2) {
-  switch (op) {
-    case '+':
-      return (n1 * d2 + n2 * d1) / (d1 * d2);
-    case '-':
-      return (n1 * d2 - n2 * d1) / (d1 * d2);
-    case '×':
-      return (n1 * n2) / (d1 * d2);
-    case '÷':
-      return (n1 * d2) / (d1 * n2);
-    default:
-      return NaN;
+function pickWeighted(items) {
+  const total = items.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of items) {
+    roll -= item.weight;
+    if (roll <= 0) return item.kind;
   }
+  return items[items.length - 1].kind;
 }
 
+/** Build fractions with a guaranteed whole-number answer (no random rejection). */
 function buildFractionProblem() {
-  for (let i = 0; i < 60; i++) {
-    const op = pick(FRAC_OPS);
-    let [n1, d1] = randomFraction();
-    let [n2, d2] = randomFraction();
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const style = pick(['same-denom', 'mul-int', 'div-frac', 'sub-same']);
 
-    if (op === '-' && n1 * d2 < n2 * d1) {
-      [n1, d1, n2, d2] = [n2, d2, n1, d1];
+    if (style === 'same-denom') {
+      const d = pick(FRAC_DENOMS);
+      const answer = randInt(2, 20);
+      const maxN1 = answer * d - 1;
+      if (maxN1 < 1) continue;
+      const n1 = randInt(1, Math.min(d * 2, maxN1));
+      const n2 = answer * d - n1;
+      if (n2 < 1) continue;
+      const text = `${formatFrac(n1, d)} + ${formatFrac(n2, d)} = ?`;
+      return { text, answer, op: 'frac' };
     }
 
-    if (op === '÷' && n2 === 0) continue;
+    if (style === 'sub-same') {
+      const d = pick(FRAC_DENOMS);
+      const n1 = randInt(2, d * 2);
+      if (n1 < 2) continue;
+      const n2 = randInt(1, n1 - 1);
+      const answer = (n1 - n2) / d;
+      if (!isIntegerValue(answer) || answer < 1) continue;
+      const text = `${formatFrac(n1, d)} − ${formatFrac(n2, d)} = ?`;
+      return { text, answer: Math.round(answer), op: 'frac' };
+    }
 
-    const answer = evalFractionOp(op, n1, d1, n2, d2);
-    if (!Number.isFinite(answer) || answer < 0) continue;
-    if (!isIntegerValue(answer)) continue;
-    if (answer > 500) continue;
+    if (style === 'mul-int') {
+      const d = pick(FRAC_DENOMS);
+      const n = randInt(1, d * 2);
+      const [sn, sd] = simplifyFrac(n, d);
+      const answer = randInt(2, 40);
+      if ((answer * sd) % sn !== 0) continue;
+      const mult = (answer * sd) / sn;
+      if (mult < 2 || mult > 24) continue;
+      const text = `${formatFrac(sn, sd)} × ${mult} = ?`;
+      return { text, answer, op: 'frac' };
+    }
 
-    const text = `${formatFrac(n1, d1)} ${op} ${formatFrac(n2, d2)} = ?`;
-    return { text, answer: Math.round(answer), op: 'frac' };
+    const answer = randInt(2, 24);
+    const [n2, d2] = randomFraction();
+    const [sn2, sd2] = simplifyFrac(n2, d2);
+    const [n1, d1] = simplifyFrac(answer * sn2, sd2);
+    if (d1 > 99 || n1 > 99) continue;
+    const text = `${formatFrac(n1, d1)} ÷ ${formatFrac(sn2, sd2)} = ?`;
+    return { text, answer, op: 'frac' };
   }
-  return null;
+
+  const d = 4;
+  return { text: `1/2 + 1/2 = ?`, answer: 1, op: 'frac' };
 }
 
 function buildExponentProblem() {
-  for (let i = 0; i < 40; i++) {
-    const base = randInt(2, 15);
-    const exp = randInt(2, 5);
-    const answer = base ** exp;
-    if (answer > 9999) continue;
-    return { text: `${base}^${exp} = ?`, answer, op: 'pow' };
-  }
-  return null;
+  const base = randInt(2, 12);
+  const exp = randInt(2, 4);
+  const answer = base ** exp;
+  return { text: `${base}^${exp} = ?`, answer, op: 'pow' };
 }
 
 function buildWildcardProblem() {
   const limits = LIMITS.wildcard;
+  const kind = pickWeighted(WILDCARD_WEIGHTS);
 
-  for (let i = 0; i < 50; i++) {
-    const kind = pick(WILDCARD_KINDS);
-    let problem = null;
+  if (kind === 'frac') {
+    const problem = buildFractionProblem();
+    return { text: problem.text, answer: problem.answer };
+  }
 
-    if (kind === 'arith') {
-      problem = buildProblem('wildcard', pick(OPS));
-      if (!withinLimits(problem, limits)) problem = null;
-    } else if (kind === 'frac') {
-      problem = buildFractionProblem();
-    } else {
-      problem = buildExponentProblem();
-    }
+  if (kind === 'pow') {
+    const problem = buildExponentProblem();
+    return { text: problem.text, answer: problem.answer };
+  }
 
-    if (problem) {
+  for (let i = 0; i < 20; i++) {
+    const problem = buildProblem('wildcard', pick(OPS));
+    if (withinLimits(problem, limits)) {
       return { text: problem.text, answer: problem.answer };
     }
   }
 
-  const fallback = buildExponentProblem() ?? buildProblem('wildcard', '+');
-  return { text: fallback.text, answer: fallback.answer };
+  const problem = buildFractionProblem();
+  return { text: problem.text, answer: problem.answer };
 }
 
 function easyAddSubOperand() {
@@ -282,7 +306,8 @@ function withinLimits({ a, b, op, answer }, limits) {
 
 function generateProblem(difficulty) {
   if (difficulty === 'wildcard') {
-    return generateWildcardProblem();
+    const problem = generateWildcardProblem();
+    return { text: problem.text, answer: problem.answer };
   }
 
   const limits = LIMITS[difficulty] ?? LIMITS.easy;
