@@ -408,9 +408,9 @@ body {
   margin: 0;
 }
 
-.input[type='number'] {
-  -moz-appearance: textfield;
-  appearance: textfield;
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .feedback {

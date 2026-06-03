@@ -174,7 +174,7 @@ function buildFractionProblem() {
       const n2 = randInt(1, n1 - 1);
       const answer = (n1 - n2) / d;
       if (!isIntegerValue(answer) || answer < 1) continue;
-      const text = `${formatFrac(n1, d)} − ${formatFrac(n2, d)} = ?`;
+      const text = `${formatFrac(n1, d)} - ${formatFrac(n2, d)} = ?`;
       return { text, answer: Math.round(answer), op: 'frac' };
     }
 
@@ -304,24 +304,34 @@ function withinLimits({ a, b, op, answer }, limits) {
   return true;
 }
 
+function normalizeProblem(problem) {
+  const answer = Number(problem?.answer);
+  const text = typeof problem?.text === 'string' ? problem.text : '2 + 2 = ?';
+  if (!Number.isFinite(answer)) {
+    return { text: '2 + 2 = ?', answer: 4 };
+  }
+  return { text, answer };
+}
+
 function generateProblem(difficulty) {
-  if (difficulty === 'wildcard') {
-    const problem = generateWildcardProblem();
-    return { text: problem.text, answer: problem.answer };
-  }
-
-  const limits = LIMITS[difficulty] ?? LIMITS.easy;
-
-  for (let i = 0; i < 40; i++) {
-    const problem = buildProblem(difficulty, pick(OPS));
-    if (withinLimits(problem, limits)) {
-      const { text, answer } = problem;
-      return { text, answer };
+  try {
+    if (difficulty === 'wildcard') {
+      return normalizeProblem(generateWildcardProblem());
     }
-  }
 
-  const fallback = buildProblem(difficulty, '+');
-  return { text: fallback.text, answer: fallback.answer };
+    const limits = LIMITS[difficulty] ?? LIMITS.easy;
+
+    for (let i = 0; i < 40; i++) {
+      const problem = buildProblem(difficulty, pick(OPS));
+      if (withinLimits(problem, limits)) {
+        return normalizeProblem(problem);
+      }
+    }
+
+    return normalizeProblem(buildProblem(difficulty, '+'));
+  } catch {
+    return { text: '2 + 2 = ?', answer: 4 };
+  }
 }
 
 function scoreKey(difficulty, minutes) {
@@ -367,6 +377,11 @@ function clearFeedback() {
   els.feedback.className = 'feedback';
 }
 
+function enableAnswerInput() {
+  els.answerInput.disabled = false;
+  els.answerInput.readOnly = false;
+}
+
 function stopTimers() {
   cancelAnimationFrame(state.timerId);
   state.timerId = null;
@@ -374,13 +389,14 @@ function stopTimers() {
     clearTimeout(state.wrongTimeoutId);
     state.wrongTimeoutId = null;
   }
-  els.answerInput.disabled = false;
+  enableAnswerInput();
 }
 
 function nextProblem() {
   state.current = generateProblem(state.difficulty);
   els.problem.textContent = state.current.text;
   els.answerInput.value = '';
+  enableAnswerInput();
   clearFeedback();
 }
 
@@ -396,6 +412,7 @@ function tickTimer() {
 }
 
 function startGame() {
+  stopTimers();
   state.difficulty = selectedDifficulty();
   state.minutes = Number(els.timeSlider.value);
   state.score = 0;
@@ -404,12 +421,12 @@ function startGame() {
   els.score.textContent = '0';
   els.timer.textContent = formatTime(state.minutes * 60 * 1000);
   clearFeedback();
+  enableAnswerInput();
 
   showScreen('play');
   nextProblem();
-  els.answerInput.focus();
+  els.answerInput.focus({ preventScroll: true });
 
-  stopTimers();
   state.timerId = requestAnimationFrame(tickTimer);
 }
 
@@ -463,15 +480,15 @@ function checkAnswer(raw) {
     const correct = state.current.answer;
     els.feedback.textContent = `Wrong — answer was ${formatAnswer(correct)}`;
     els.feedback.className = 'feedback bad';
-    els.answerInput.disabled = true;
+    enableAnswerInput();
+    if (state.wrongTimeoutId !== null) clearTimeout(state.wrongTimeoutId);
     state.wrongTimeoutId = setTimeout(() => {
       state.wrongTimeoutId = null;
       if (Date.now() < state.endsAt) {
-        els.answerInput.disabled = false;
         nextProblem();
-        els.answerInput.focus();
+        els.answerInput.focus({ preventScroll: true });
       }
-    }, 650);
+    }, 800);
   }
 }
 
