@@ -138,56 +138,135 @@ function focusAnswerInput() {
   }
 }
 
-function generateWildcardProblem() {
-  const roll = Math.random();
-
-  if (roll < 0.34) {
-    const d = pick(FRAC_DENOMS);
-    const answer = randInt(1, 15);
-    const maxN1 = answer * d - 1;
-    if (maxN1 >= 1) {
-      const n1 = randInt(1, maxN1);
-      const n2 = answer * d - n1;
-      if (n2 >= 1) {
-        return {
-          text: `${formatFrac(n1, d)} + ${formatFrac(n2, d)} = ?`,
-          answer,
-        };
-      }
-    }
+function pickWeightedBuilder(builders) {
+  const total = builders.reduce((sum, b) => sum + b.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of builders) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.fn;
   }
+  return builders[builders.length - 1].fn;
+}
 
-  if (roll < 0.67) {
-    const base = randInt(2, 12);
-    const exp = randInt(2, 4);
-    return {
-      text: `${base}^${exp} = ?`,
-      answer: Math.pow(base, exp),
-    };
-  }
-
-  const mult = randInt(2, 12);
+function buildFracSameDenomAdd() {
   const d = pick(FRAC_DENOMS);
-  const n = randInt(1, d - 1);
-  const answer = randInt(2, 30);
-  if ((answer * d) % n === 0) {
-    const m = (answer * d) / n;
-    if (m >= 2 && m <= 20) {
+  const answer = randInt(1, 15);
+  const n1 = randInt(1, answer * d - 1);
+  const n2 = answer * d - n1;
+  return {
+    text: `${formatFrac(n1, d)} + ${formatFrac(n2, d)} = ?`,
+    answer,
+  };
+}
+
+function buildFracDiffDenomAdd() {
+  for (let i = 0; i < 50; i++) {
+    const d1 = pick(FRAC_DENOMS);
+    let d2 = pick(FRAC_DENOMS);
+    if (d1 === d2) d2 = pick(FRAC_DENOMS.filter((d) => d !== d1));
+    const n1 = randInt(1, d1);
+    const n2 = randInt(1, d2);
+    const sum = (n1 * d2 + n2 * d1) / (d1 * d2);
+    if (isIntegerValue(sum) && sum >= 1 && sum <= 40) {
       return {
-        text: `${formatFrac(n, d)} × ${m} = ?`,
-        answer,
+        text: `${formatFrac(n1, d1)} + ${formatFrac(n2, d2)} = ?`,
+        answer: Math.round(sum),
       };
     }
   }
+  return buildFracSameDenomAdd();
+}
 
+function buildFracSameDenomSub() {
+  const d = pick(FRAC_DENOMS);
+  const answer = randInt(1, 12);
+  const n2 = randInt(1, d - 1);
+  const n1 = answer * d + n2;
+  return {
+    text: `${formatFrac(n1, d)} - ${formatFrac(n2, d)} = ?`,
+    answer,
+  };
+}
+
+function buildFracMulInt() {
+  for (let i = 0; i < 40; i++) {
+    const d = pick(FRAC_DENOMS);
+    const n = randInt(1, d * 2);
+    const [sn, sd] = simplifyFrac(n, d);
+    const answer = randInt(2, 36);
+    if ((answer * sd) % sn !== 0) continue;
+    const mult = (answer * sd) / sn;
+    if (mult < 2 || mult > 24) continue;
+    return {
+      text: `${formatFrac(sn, sd)} × ${mult} = ?`,
+      answer,
+    };
+  }
+  return buildFracSameDenomAdd();
+}
+
+function buildFracDiv() {
+  const answer = randInt(2, 20);
+  const d2 = pick(FRAC_DENOMS);
+  const n2 = randInt(1, d2);
+  const [sn2, sd2] = simplifyFrac(n2, d2);
+  const [n1, d1] = simplifyFrac(answer * sn2, sd2);
+  return {
+    text: `${formatFrac(n1, d1)} ÷ ${formatFrac(sn2, sd2)} = ?`,
+    answer,
+  };
+}
+
+function buildFracTimesFrac() {
+  for (let i = 0; i < 50; i++) {
+    const d1 = pick(FRAC_DENOMS);
+    const d2 = pick(FRAC_DENOMS);
+    const n1 = randInt(1, d1);
+    const n2 = randInt(1, d2);
+    const product = (n1 * n2) / (d1 * d2);
+    if (isIntegerValue(product) && product >= 1 && product <= 40) {
+      return {
+        text: `${formatFrac(n1, d1)} × ${formatFrac(n2, d2)} = ?`,
+        answer: Math.round(product),
+      };
+    }
+  }
+  return buildFracMulInt();
+}
+
+function buildWildcardExponent() {
+  const base = randInt(2, 12);
+  const exp = randInt(2, 5);
+  return {
+    text: `${base}^${exp} = ?`,
+    answer: Math.pow(base, exp),
+  };
+}
+
+function buildWildcardArith() {
   for (let i = 0; i < 20; i++) {
     const problem = buildProblem('hard', pick(OPS));
     if (withinLimits(problem, LIMITS.hard)) {
       return { text: problem.text, answer: problem.answer };
     }
   }
+  return buildWildcardExponent();
+}
 
-  return { text: '3^2 = ?', answer: 9 };
+const WILDCARD_BUILDERS = [
+  { weight: 2, fn: buildFracSameDenomAdd },
+  { weight: 3, fn: buildFracDiffDenomAdd },
+  { weight: 2, fn: buildFracSameDenomSub },
+  { weight: 2, fn: buildFracMulInt },
+  { weight: 2, fn: buildFracTimesFrac },
+  { weight: 2, fn: buildFracDiv },
+  { weight: 4, fn: buildWildcardExponent },
+  { weight: 1, fn: buildWildcardArith },
+];
+
+function generateWildcardProblem() {
+  const builder = pickWeightedBuilder(WILDCARD_BUILDERS);
+  return builder();
 }
 
 function easyAddSubOperand() {
